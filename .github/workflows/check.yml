@@ -1,0 +1,46 @@
+name: check
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      chat_id:
+        description: "chat id для ручной команды /check (пусто = обычная проверка)"
+        required: false
+        default: ""
+
+concurrency:
+  group: schedule
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python check.py
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+          API_SECRET: ${{ secrets.API_SECRET }}
+          CHAT_ID: ${{ github.event.inputs.chat_id }}
+
+      - name: Save state
+        run: |
+          git config user.name "schedule-bot"
+          git config user.email "schedule-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || (git commit -m "update state" && git push)
